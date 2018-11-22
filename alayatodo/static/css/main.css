@@ -10,3 +10,8 @@ div.error {
     color: #300;
     background-color: #fcc;
 }
+
+div.confirmation {
+    color: #030;
+    background-color: #cfc;
+}

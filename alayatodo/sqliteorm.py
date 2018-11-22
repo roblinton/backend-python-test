@@ -39,7 +39,7 @@ class Table:
     def delete(self, **kwargs):
         if not kwargs:
             raise ValueError('No filter provided to delete!  Use delete_all() if you really want this.')
-        return g.db.execute('DELETE FROM {}{}'.format(self.tablename, self._where(kwargs)))
+        return g.db.execute('DELETE FROM {}{}'.format(self.tablename, self._where(kwargs)), list(kwargs.values()))
 
     def delete_all(self):
         return g.db.execute('DELETE FROM {}'.format(self.tablename))

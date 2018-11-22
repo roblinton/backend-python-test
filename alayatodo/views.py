@@ -74,6 +74,7 @@ def todos_POST():
     else:
         g.models.todos.create(user_id=session['user']['id'], description=todo_description)
         g.db.commit()
+        flash('New Todo added.', 'confirmation')
     return redirect('/todo')
 
 
@@ -81,6 +82,7 @@ def todos_POST():
 def todo_delete(id):
     if not session.get('logged_in'):
         return redirect('/login')
-    g.db.models.todos.delete(id=id)
+    g.models.todos.delete(id=id)
     g.db.commit()
+    flash('Todo deleted.', 'confirmation')
     return redirect('/todo')
