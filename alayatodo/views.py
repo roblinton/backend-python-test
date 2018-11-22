@@ -2,6 +2,7 @@ from alayatodo import app
 from alayatodo.sqliteorm import DoesNotExist
 from flask import (
     abort,
+    flash,
     g,
     redirect,
     render_template,
@@ -67,8 +68,12 @@ def todos():
 def todos_POST():
     if not session.get('logged_in'):
         return redirect('/login')
-    g.models.todos.create(user_id=session['user']['id'], description=request.form.get('description', ''))
-    g.db.commit()
+    todo_description = request.form.get('description')
+    if not todo_description:
+        flash('Description may not be blank.', 'error')
+    else:
+        g.models.todos.create(user_id=session['user']['id'], description=todo_description)
+        g.db.commit()
     return redirect('/todo')
 
 
