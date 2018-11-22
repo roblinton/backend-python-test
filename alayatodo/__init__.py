@@ -1,6 +1,8 @@
 from flask import Flask, g
 import sqlite3
 
+from alayatodo.sqliteorm import ModelAccessor
+
 # configuration
 DATABASE = '/tmp/alayatodo.db'
 DEBUG = True
@@ -22,6 +24,7 @@ def connect_db():
 @app.before_request
 def before_request():
     g.db = connect_db()
+    g.models = ModelAccessor()
 
 
 @app.teardown_request

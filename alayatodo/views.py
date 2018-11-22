@@ -1,5 +1,7 @@
 from alayatodo import app
+from alayatodo.sqliteorm import DoesNotExist
 from flask import (
+    abort,
     g,
     redirect,
     render_template,
@@ -24,15 +26,14 @@ def login():
 def login_POST():
     username = request.form.get('username')
     password = request.form.get('password')
-
-    sql = "SELECT * FROM users WHERE username = '%s' AND password = '%s'";
-    cur = g.db.execute(sql % (username, password))
-    user = cur.fetchone()
-    if user:
-        session['user'] = dict(user)
-        session['logged_in'] = True
-        return redirect('/todo')
-
+    try:
+        user = g.models.users.get(username=username, password=password)
+        if user:
+            session['user'] = dict(user.items())
+            session['logged_in'] = True
+            return redirect('/todo')
+    except DoesNotExist:
+        pass
     return redirect('/login')
 
 
@@ -45,9 +46,11 @@ def logout():
 
 @app.route('/todo/<id>', methods=['GET'])
 def todo(id):
-    cur = g.db.execute("SELECT * FROM todos WHERE id ='%s'" % id)
-    todo = cur.fetchone()
-    return render_template('todo.html', todo=todo)
+    try:
+        todo = g.models.todos.get(id=id)
+        return render_template('todo.html', todo=todo)
+    except DoesNotExist:
+        abort(404)
 
 
 @app.route('/todo', methods=['GET'])
@@ -55,8 +58,7 @@ def todo(id):
 def todos():
     if not session.get('logged_in'):
         return redirect('/login')
-    cur = g.db.execute("SELECT * FROM todos")
-    todos = cur.fetchall()
+    todos = g.models.todos.list()
     return render_template('todos.html', todos=todos)
 
 
@@ -65,10 +67,7 @@ def todos():
 def todos_POST():
     if not session.get('logged_in'):
         return redirect('/login')
-    g.db.execute(
-        "INSERT INTO todos (user_id, description) VALUES ('%s', '%s')"
-        % (session['user']['id'], request.form.get('description', ''))
-    )
+    g.models.todos.create(user_id=session['user']['id'], description=request.form.get('description', ''))
     g.db.commit()
     return redirect('/todo')
 
@@ -77,6 +76,6 @@ def todos_POST():
 def todo_delete(id):
     if not session.get('logged_in'):
         return redirect('/login')
-    g.db.execute("DELETE FROM todos WHERE id ='%s'" % id)
+    g.db.models.todos.delete(id=id)
     g.db.commit()
     return redirect('/todo')
