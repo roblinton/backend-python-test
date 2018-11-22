@@ -29,6 +29,3 @@ def teardown_request(exception):
     db = getattr(g, 'db', None)
     if db is not None:
         db.close()
-
-
-import alayatodo.views
