@@ -1,0 +1,16 @@
+version: "3"
+services:
+  alaya:
+    build: .
+    working_dir: /var/alaya
+    environment:
+      - PYTHONUNBUFFERED=1
+      - FLASK_ENV=development
+      - FLASK_APP=main:app
+    volumes:
+      - ./:/var/alaya
+      - /tmp:/tmp
+    ports:
+     - "5000:5000"
+    restart: always
+    command: "flask run --host=0.0.0.0"
