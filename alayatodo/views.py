@@ -89,14 +89,23 @@ def todos_POST():
 
 
 @app.route('/todo/<int:id>/', methods=['POST'])
-def todo_delete(id):
+def todo_post(id):
+    action = request.args.get('action', None)
+    print('action: {}'.format(action))
     if not session.get('logged_in'):
         return redirect('/login')
-    g.models.todos.where(id=id).delete(id=id)
-    g.db.commit()
+    if action == 'delete':
+        g.models.todos.where(id=id).delete()
+        g.db.commit()
+        flash('Todo deleted.', 'confirmation')
+    elif action == 'toggle':
+        todo = g.models.todos.get(id=id)
+        todo.status = 0 if todo.status else 1
+        todo.save()
+        g.db.commit()
+        flash('Set status to: {}'.format('completed' if todo.status else 'pending'), 'confirmation')
     paging = get_paging(g.models.todos)
     page = min(paging['start'], paging['max'])
-    flash('Todo deleted.', 'confirmation')
     return redirect('/todo/?p={}'.format(page))
 
 

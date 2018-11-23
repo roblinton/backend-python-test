@@ -10,7 +10,7 @@
             <td>{{ todo.user_id }}</td>
             <td>{{ todo.description }}</td>
             <td>
-                <form method="post" action="{{ url_for('todo_delete', id=todo.id) }}">
+                <form method="post" action="{{ url_for('todo_post', id=todo.id, action='delete', p=0) }}">
                     <button type="submit" class="btn btn-xs btn-danger"><span class="glyphicon glyphicon-remove glyphicon-white"></span></button>
                 </form>
             </td>

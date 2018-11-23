@@ -130,7 +130,7 @@ class Query:
         return (self.model.model_class(**row) for row in self._execute())
 
     def update(self, **kwargs):
-        self.base_sql = 'UPDATE {}'.format(self.tablename)
+        self.base_qry = 'UPDATE {}'.format(self.model.tablename)
         self._update.update(**kwargs)
         return self._execute()
 
@@ -144,7 +144,7 @@ class Query:
 
     def _execute(self):
         sql, qry_args = self._build_query(self.base_qry)
-        print('_execute() {}, {}'.format(sql, qry_args))
+        # print('_execute() {}, {}'.format(sql, qry_args))
         return g.db.execute(sql, qry_args)
 
     def _build_query(self, base_qry):
@@ -153,8 +153,7 @@ class Query:
         where = self._build_where(qry_args)
         limit = ' LIMIT {}'.format(self._limit) if self._limit is not None else ''
         offset = ' OFFSET {}'.format(self._offset) if self._offset is not None else ''
-        print('_build_query() {}, {}, {}'.format(where, self._limit, self._offset))
-        return ('{}{}{}{}'.format(base_qry, where, limit, offset), qry_args)
+        return ('{}{}{}{}{}'.format(base_qry, update, where, limit, offset), qry_args)
 
     def _build_where(self, qry_args):
         """Supports only equality operators ANDed together."""
@@ -163,7 +162,7 @@ class Query:
 
     def _build_update(self, qry_args):
         qry_args.extend(self._update.values())
-        return 'SET {}'.format(', '.join(self._params(self._update))) if self._update else ''
+        return ' SET {}'.format(', '.join(self._params(self._update))) if self._update else ''
 
     def _params(self, valdict):
         """Returns key=? strings suitable for sqlite's parameter substitution."""
@@ -211,9 +210,9 @@ class DBModel:
         if getattr(self, self._manager.primary_key) is None:
             self._manager.create(**self.todict())
         else:
-            valdict = obj.todict()
+            valdict = self.todict()
             where = {self._manager.primary_key: valdict.pop(self._manager.primary_key)}
-            self._manager.update(where, **valdict)
+            self._manager.where(**where).update(**valdict)
 
 
 class ModelAccessor:
