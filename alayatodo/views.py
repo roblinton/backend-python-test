@@ -3,6 +3,7 @@ from alayatodo.sqliteorm import DoesNotExist
 from flask import (
     abort,
     flash,
+    jsonify,
     g,
     redirect,
     render_template,
@@ -45,21 +46,30 @@ def logout():
     return redirect('/')
 
 
-@app.route('/todo/<id>/', methods=['GET'])
-def todo(id):
+@app.route('/todo/<int:id>/', methods=['GET'])
+@app.route('/todo/<int:id>/<string:ctype>/', methods=['GET'])
+def todo(id, ctype=None):
     try:
         todo = g.models.todos.get(id=id)
+        if ctype == 'json':
+            return jsonify(todo.todict())
         return render_template('todo.html', todo=todo)
     except DoesNotExist:
         abort(404)
 
 
 @app.route('/todo/', methods=['GET'])
-def todos():
+@app.route('/todo/<string:ctype>/', methods=['GET'])
+def todos(ctype=None):
     if not session.get('logged_in'):
         return redirect('/login')
     paging = get_paging(g.models.todos)
     todos = g.models.todos.all()[paging['start'] : paging['end']]
+    if ctype == 'json':
+        return jsonify({
+            'meta': {'offset': paging['start'], 'total': paging['total']},
+            'objects': [t.todict() for t in todos],
+        })
     return render_template('todos.html', todos=todos, paging=paging)
 
 
@@ -78,7 +88,7 @@ def todos_POST():
     return redirect('/todo/?p={}'.format(page))
 
 
-@app.route('/todo/<id>/', methods=['POST'])
+@app.route('/todo/<int:id>/', methods=['POST'])
 def todo_delete(id):
     if not session.get('logged_in'):
         return redirect('/login')
@@ -91,11 +101,14 @@ def todo_delete(id):
 
 
 def get_paging(model):
-    sz = app.config['PER_PAGE']
+    try:
+        sz = int(request.args.get('l', app.config['PER_PAGE']))
+    except:
+        sz = app.config['PER_PAGE']
     tl = model.count()
     mx = tl - (tl%sz or sz)
     try:
-        st = min(int(request.args.get('p', 0)), mx)
+        st = min(int(request.args.get('p', 0)), tl)
     except:
         st = 0
     end = min(st+sz, tl)

@@ -112,7 +112,7 @@ class Query:
                 raise ValueError('Stepping is not supported.')
             if self._offset < 0 or self._limit < 0:
                 raise ValueError('Offset and limit arguments cannot be negative.')
-            return iter(self)
+            return list(self.select())
         else:
             self._offset = int(k)
             self._limit = 1
