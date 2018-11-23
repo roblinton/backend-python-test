@@ -9,6 +9,7 @@ DEBUG = True
 SECRET_KEY = 'development key'
 USERNAME = 'admin'
 PASSWORD = 'default'
+PER_PAGE = 3
 
 
 app = Flask(__name__)

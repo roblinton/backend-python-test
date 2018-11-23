@@ -15,12 +15,19 @@
                     </a>
                 </td>
                 <td>
-                    <form method="post" action="{{ url_for('todo_delete', id=todo.id) }}">
+                    <form method="post" action="{{ url_for('todo_delete', id=todo.id, p=paging.start) }}">
                         <button type="submit" class="btn btn-xs btn-danger"><span class="glyphicon glyphicon-remove glyphicon-white"></span></button>
                     </form>
                 </td>
             </tr>
         {% endfor %}
+        <tr>
+            <td colspan="4">
+                {% if paging.prev is not none %}<a href="?p={{ paging.prev }}">&lt;&lt;</a>{% endif %}
+                {{ paging.start }} to {{ paging.end }} of {{ paging.total }}
+                {% if paging.next %}<a href="?p={{ paging.next }}">&gt;&gt;</a>{% endif %}
+            </td>
+        </tr>
         <tr>
             <form method="post" action="{{ url_for('todos_POST') }}">
                 <td colspan="3">

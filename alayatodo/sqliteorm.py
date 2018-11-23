@@ -24,36 +24,26 @@ class Table:
         cr = g.db.execute(sql, list(kwargs.values()))
         return self.get(rowid=cr.lastrowid)
 
-    def list(self, **kwargs):
-        return [self.model_class(**r) for r in self._list(kwargs).fetchall()]
+    def all(self):
+        return self._query()
+
+    def where(self, **kwargs):
+        return self._query(**kwargs)
 
     def get(self, **kwargs):
-        cr = self._list(kwargs)
-        row = cr.fetchone()
-        if row is None:
+        qry = iter(self._list(kwargs))
+        try:
+            obj = next(qry)
+        except StopIteration:
             raise DoesNotExist
-        if cr.fetchone() is not None:
+        try:
+            next(qry)
             raise MultipleObjectsReturned
-        return self.model_class(**row)
+        except StopIteration:
+            return obj
 
-    def delete(self, **kwargs):
-        if not kwargs:
-            raise ValueError('No filter provided to delete!  Use delete_all() if you really want this.')
-        return g.db.execute('DELETE FROM {}{}'.format(self.tablename, self._where(kwargs)), list(kwargs.values()))
-
-    def delete_all(self):
-        return g.db.execute('DELETE FROM {}'.format(self.tablename))
-
-    def update(self, where, **kwargs):
-        """TODO: finish"""
-        if not where:
-            raise ValueError('No where argument provided to update!  Use update_all() if you really want this.')
-        sql = 'UPDATE {} SET {}{}'.format(self.tablename, ', '.join(self._params(kwargs)), self._where(where))
-        return g.db.execute(sql, list(valdict.values()) + list(where.values()))
-
-    def update_all(**kwargs):
-        sql = 'UPDATE {} SET {}'.format(self.tablename, ', '.join(self._params(kwargs)))
-        return g.db.execute(sql, list(valdict.values()))
+    def count(self):
+        return self._query().count()
 
     @property
     def model_class(self):
@@ -85,19 +75,10 @@ class Table:
         """Returns a cursor with the rows returned according to the filters in
         valdict.
         """
-        sql = 'SELECT * FROM {}{}'.format(self.tablename, self._where(valdict))
-        # print('QUERY: {}, {}'.format(sql, valdict.values()))
-        return g.db.execute(sql, list(valdict.values()))
+        return self._query(**valdict).select()
 
-    def _where(self, valdict):
-        """Supports only equality operators ANDed together."""
-        if valdict:
-            return ' WHERE {}'.format(' AND '.join(self._params(valdict)))
-        return ''
-
-    def _params(self, valdict):
-        """Returns key=? strings suitable for sqlite's parameter substitution."""
-        return ['{} = ?'.format(f) for f in self._validate_fields(valdict)]
+    def _query(self, **where):
+        return Query(self).where(**where)
 
     def _validate_fields(self, valdict):
         """Ensures that a dict contains only keys corresponding to columns in
@@ -109,7 +90,87 @@ class Table:
         return valdict
 
 
-class DBModel(object):
+class Query:
+    """
+    """
+
+    def __init__(self, model):
+        self.model = model
+        self._update = {}
+        self._where = {}
+        self._offset = None
+        self._limit = None
+
+    def __iter__(self):
+        return self.select()
+
+    def __getitem__(self, k):
+        if isinstance(k, slice):
+            self._offset = int(k.start)
+            self._limit = int(k.stop - k.start)
+            if k.step is not None:
+                raise ValueError('Stepping is not supported.')
+            if self._offset < 0 or self._limit < 0:
+                raise ValueError('Offset and limit arguments cannot be negative.')
+            return iter(self)
+        else:
+            self._offset = int(k)
+            self._limit = 1
+            try:
+                return self.model.model_class(**next(self.select()))
+            except StopIteration as e:
+                raise IndexError from e
+
+    def where(self, **where):
+        self._where.update(where)
+        return self
+
+    def select(self):
+        self.base_qry = 'SELECT * FROM {}'.format(self.model.tablename)
+        return (self.model.model_class(**row) for row in self._execute())
+
+    def update(self, **kwargs):
+        self.base_sql = 'UPDATE {}'.format(self.tablename)
+        self._update.update(**kwargs)
+        return self._execute()
+
+    def delete(self):
+        self.base_qry = 'DELETE FROM {}'.format(self.model.tablename)
+        return self._execute()
+
+    def count(self):
+        self.base_qry = 'SELECT count({}) AS total FROM {}'.format(self.model.primary_key, self.model.tablename)
+        return next(self._execute())['total']
+
+    def _execute(self):
+        sql, qry_args = self._build_query(self.base_qry)
+        print('_execute() {}, {}'.format(sql, qry_args))
+        return g.db.execute(sql, qry_args)
+
+    def _build_query(self, base_qry):
+        qry_args = []
+        update = self._build_update(qry_args)
+        where = self._build_where(qry_args)
+        limit = ' LIMIT {}'.format(self._limit) if self._limit is not None else ''
+        offset = ' OFFSET {}'.format(self._offset) if self._offset is not None else ''
+        print('_build_query() {}, {}, {}'.format(where, self._limit, self._offset))
+        return ('{}{}{}{}'.format(base_qry, where, limit, offset), qry_args)
+
+    def _build_where(self, qry_args):
+        """Supports only equality operators ANDed together."""
+        qry_args.extend(self._where.values())
+        return ' WHERE {}'.format(' AND '.join(self._params(self._where))) if self._where else ''
+
+    def _build_update(self, qry_args):
+        qry_args.extend(self._update.values())
+        return 'SET {}'.format(', '.join(self._params(self._update))) if self._update else ''
+
+    def _params(self, valdict):
+        """Returns key=? strings suitable for sqlite's parameter substitution."""
+        return ['{} = ?'.format(f) for f in self.model._validate_fields(valdict)]
+
+
+class DBModel:
     """A DBModel represents a row in the database.
 
     Mostly works like a dict.  Implements __slots__ so it's more efficient
@@ -148,7 +209,7 @@ class DBModel(object):
         a primary key.
         """
         if getattr(self, self._manager.primary_key) is None:
-            self._manager.insert(*self)
+            self._manager.create(**self.todict())
         else:
             valdict = obj.todict()
             where = {self._manager.primary_key: valdict.pop(self._manager.primary_key)}
